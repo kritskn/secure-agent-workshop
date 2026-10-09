@@ -1,0 +1,4 @@
+# Keep shell scripts and fingerprinted text assets identical across platforms.
+* text=auto eol=lf
+# The participant guide is binary; never normalize its bytes.
+*.pdf -text

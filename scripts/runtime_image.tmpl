@@ -1,0 +1,23 @@
+{{- .Id -}}|{{- .Os -}}|{{- .Architecture -}}|
+{{- with index . "Config" -}}
+{{- with index . "Labels" -}}
+  {{- index . "org.secagent.prep.source-sha256" -}}
+{{- end -}}|
+{{- if and (eq (index . "User") "1000:1000")
+    (eq (index . "WorkingDir") "/home/lab-user")
+    (eq (json (index . "Cmd")) "[\"/bin/bash\"]")
+    (not (index . "Entrypoint")) (not (index . "ExposedPorts"))
+    (not (index . "Volumes")) -}}ok{{- end -}}|
+{{- range index . "Env" -}}
+  {{- if eq (printf "%.5s" .) "HOME=" -}}
+    {{- if eq . "HOME=/home/lab-user" -}}ok{{- else -}}bad{{- end -}}
+  {{- end -}}
+{{- end -}}|
+{{- range index . "Env" -}}
+  {{- if eq (printf "%.5s" .) "PATH=" -}}
+    {{- if eq (printf "%.31s" .) "PATH=/opt/secagent/runtime/bin:" -}}
+      ok
+    {{- else -}}bad{{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}

@@ -1,0 +1,7 @@
+{{- .Name -}}|{{- .Driver -}}|{{- .Scope -}}|
+{{- if not (index . "Options") -}}ok{{- end -}}|
+{{- with index . "Labels" -}}
+{{- index . "org.secagent.owner" -}}|
+{{- index . "org.secagent.role" -}}|
+{{- index . "org.secagent.schema" -}}
+{{- end -}}
