@@ -21,13 +21,13 @@ source "${BASH_SOURCE[0]%/*}/prep_recovery.sh"
 # Arguments: trusted project directory. Outputs: brief checks/recovery guidance.
 # LAB_SETUP_BRIEF is reused for scoped setup/check detail filtering.
 # Locals LAB_SETUP_BRIEF/LAB_WORK_TITLE/LAB_WORK_WORD shadow caller values.
-# Returns: 0 passed, 1 prerequisite failure, 3 typed live failure; other errors
-#   from the live transport are preserved. No prompts, repairs or retries.
+# Returns: 0 pass, 1 prerequisite failure, 3 other live failure, 4 key rejected;
+#   other transport errors are preserved. No prompts, repairs or retries.
 # Live checker includes offline prerequisites; one inference at most.
 # No lab infrastructure or enforcement qualification. Native calls need consent.
 #######################################
 check_preparation() {
-  local project="${1:-}" status stage=profile LAB_SETUP_BRIEF=0
+  local project="${1:-}" status LAB_SETUP_BRIEF=0
   local LAB_WORK_TITLE='Checking tools' LAB_WORK_WORD='Working…'
   if (( $# != 1 )) || [[ -z "${project}" ]]; then
     lab_print '%s\n' '[FAIL] Expected the preparation project directory.' >&2
@@ -72,9 +72,6 @@ check_preparation() {
   else
     status=$?
   fi
-  if (( status == 3 )); then
-    stage=live
-  fi
-  prep_recovery "${stage}"
+  prep_recovery live "${status}"
   return "${status}"
 }

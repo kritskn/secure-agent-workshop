@@ -8,7 +8,7 @@ COPY --chown=0:0 scripts/prepare_guest.py /opt/secagent/preparation/prepare_gues
 COPY --chown=0:0 scripts/setup_guest_pi.py /opt/secagent/preparation/setup_guest_pi.py
 COPY --chown=0:0 scripts/runtime_config.json /opt/secagent/preparation/runtime_config.json
 
-# Docker RUN uses /bin/sh. Keep the guest entry point and its guards unchanged.
+# Docker RUN uses /bin/sh and calls the image-only runtime installer.
 # Root supplies OS packages; the installer runs npm/Pi as this fixed user.
 # Only generated build artifacts are sealed as root-owned before publication.
 RUN set -eu; \
@@ -34,7 +34,7 @@ profile = runpy.run_path(str(source / "setup_guest_pi.py")); \
 config = profile["load_runtime_config"]( \
     (source / "runtime_config.json").read_bytes()); \
 runtime = runpy.run_path(str(source / "prepare_guest.py")); \
-runtime["install_runtime"](platform.machine(), config["pi"], image_build=True)'; \
+runtime["install_runtime"](platform.machine(), config["pi"])'; \
     rm -rf /var/lib/apt/lists/*
 
 # Profile initialization from checkout assets remains a separate step.

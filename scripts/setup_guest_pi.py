@@ -3,14 +3,13 @@
 import io
 import json
 import os
-from pathlib import Path
 import platform
 import re
 import stat
-import sys
+import sys  # noqa: F401 - Preserved lab2_seed generated bootstrap consumes sys.stdin.
 import tarfile
 import tempfile
-
+from pathlib import Path
 
 CONTAINER_HOME = Path("/home/lab-user")
 CONTAINER_ASSETS = {
@@ -291,24 +290,3 @@ def initialize_container_volume(stream):
         if (os.geteuid(), os.getegid(), os.getgroups()) != (1000, 1000, []):
             raise RuntimeError("Could not drop initializer privileges")
         initialize_container_home(source, CONTAINER_HOME, 1000, 1000)
-
-
-def main(args=None):
-    args = sys.argv[1:] if args is None else args
-    if len(args) != 1:
-        print("Usage: python3 setup_guest_pi.py <staged-profile-directory>", file=sys.stderr)
-        return 2
-    if (platform.system() != "Linux" or platform.node() != "lima-secagent-lab"
-            or os.geteuid() == 0):
-        print("[FAIL] Run as the ordinary user inside secagent-lab only.", file=sys.stderr)
-        return 1
-    try:
-        setup(Path(args[0]), Path(os.environ["HOME"]), os.geteuid())
-    except (KeyError, OSError, RuntimeError, ValueError) as error:
-        print(f"[FAIL] Guest Pi profile setup: {error}", file=sys.stderr)
-        return 1
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

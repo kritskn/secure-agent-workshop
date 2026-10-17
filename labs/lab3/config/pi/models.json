@@ -1,0 +1,24 @@
+{
+  "providers": {
+    "ollama": {
+      "baseUrl": "https://ollama.com/v1",
+      "api": "openai-completions",
+      "apiKey": "${LAB3_OLLAMA_API_KEY}",
+      "models": [
+        {
+          "id": "nemotron-3-super",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": null,
+            "low": null,
+            "medium": "medium",
+            "high": null,
+            "xhigh": null,
+            "max": null
+          }
+        }
+      ]
+    }
+  }
+}

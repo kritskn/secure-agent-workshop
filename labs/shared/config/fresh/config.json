@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "theme": "builtin://terminal",
+  "editor": {
+    "line_numbers": true,
+    "relative_line_numbers": false
+  },
+  "check_for_updates": false,
+  "lsp_enabled": false
+}

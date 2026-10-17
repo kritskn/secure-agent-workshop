@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Docker preparation, live checks, confirmed preparation removal and inert help.
+# Preparation, Lab 1/2/3 lifecycle, software builds and confirmed removal.
 
 set -euo pipefail
 # Internal output/cleanup state belongs to this invocation, never its env.
@@ -28,16 +28,45 @@ main() {
         exec "${BASH}" "${SCRIPT_DIR}/scripts/lab_help.sh"
       fi
       ;;
-    setup|check|remove)
+    lab1)
+      shift
+      exec "${BASH}" "${SCRIPT_DIR}/scripts/lab1.sh" "$@"
+      ;;
+    lab2)
+      shift
+      exec "${BASH}" "${SCRIPT_DIR}/scripts/lab2.sh" "$@"
+      ;;
+    lab3)
+      shift
+      exec "${BASH}" "${SCRIPT_DIR}/scripts/lab3.sh" "$@"
+      ;;
+    build-labs)
+      shift
+      exec "${BASH}" "${SCRIPT_DIR}/scripts/build_labs.sh" "$@"
+      ;;
+    remove)
+      if (( $# == 2 )) && [[ "$2" == --help ]]; then
+        exec "${BASH}" "${SCRIPT_DIR}/scripts/lab_help.sh" remove
+      fi
+      shift
+      if "${BASH}" "${SCRIPT_DIR}/scripts/lab_remove.sh" "$@"; then
+        return 0
+      else
+        return $?
+      fi
+      ;;
+    setup|check)
       if (( $# == 2 )) && [[ "$2" == '--help' ]]; then
         exec "${BASH}" "${SCRIPT_DIR}/scripts/lab_help.sh" "$1"
       fi
-      if (( $# == 1 )); then
+      if [[ $# -eq 1 || ( "$1" == setup && "${2:-}" == --build-only \
+        && ( $# -eq 2 || ( $# -eq 3 && "$3" == --no-cache ) ) ) ]]; then
         script="${SCRIPT_DIR}/scripts/check_lab.sh"
-        if [[ "$1" == 'setup' || "$1" == 'remove' ]]; then
+        if [[ "$1" == 'setup' ]]; then
           script="${SCRIPT_DIR}/scripts/lab_$1.sh"
         fi
-        if "${BASH}" "${script}"; then
+        shift
+        if "${BASH}" "${script}" "$@"; then
           return 0
         else
           status=$?

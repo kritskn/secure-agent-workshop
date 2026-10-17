@@ -27,13 +27,17 @@ cleanup() {
 # Globals: TTY_STATE/PASTE_ENABLED (restored), tracing (disabled for input).
 # Arguments: install|replace, then trusted command and its public arguments.
 # Outputs: masked prompt/status; consumer output is its caller's responsibility.
-# Returns: 0 saved, 3 replacement declined, 1 input/transport failure.
+# Returns: 5 entry ended before submission; consumer status (5 becomes 1).
 #######################################
 main() {
-  local mode="${1:-}" prompt token
-  if (( $# < 2 )) || [[ ! -t 0 ]]; then
-    lab_status FAIL 'No interactive terminal for masked token entry.'
+  local mode="${1:-}" prompt token status
+  if (( $# < 2 )); then
+    lab_status FAIL 'Expected token mode and consumer command.'
     return 1
+  fi
+  if [[ ! -t 0 ]]; then
+    lab_status FAIL 'No interactive terminal for masked token entry.'
+    return 5
   fi
   shift
   case "${mode}" in
@@ -44,41 +48,39 @@ main() {
     *) return 1 ;;
   esac
   trap cleanup EXIT
-  trap 'exit 130' INT
+  trap 'exit 5' INT # Before submission only; EXIT restores the terminal.
   trap 'exit 143' TERM
   trap 'exit 129' HUP
   unset token
-  TTY_STATE="$(stty -g </dev/tty)" || return 1
-  stty -echo -icanon min 1 time 0 </dev/tty || return 1
+  TTY_STATE="$(stty -g </dev/tty)" || return 5
+  # Handle the Ctrl-C key locally; do not signal the waiting setup adapter.
+  # Restore the original interrupt character before dispatching the consumer.
+  stty -echo -icanon intr undef min 1 time 0 </dev/tty || return 5
   if [[ "${TERM:-dumb}" =~ ^(xterm|screen|tmux|rxvt|vt100) ]]; then
     PASTE_ENABLED=1
-    printf '\033[?2004h' >/dev/tty || return 1
+    printf '\033[?2004h' >/dev/tty || return 5
   fi
-  printf '%s' "${prompt}" >/dev/tty || return 1
+  printf '%s' "${prompt}" >/dev/tty || return 5
   if ! read_masked_token; then
-    lab_print '\n%s\n' '[FAIL] Token input failed; no key was saved.' >&2
-    return 1
+    printf '\n' >&2
+    return 5
   fi
-  stty "${TTY_STATE}" </dev/tty || return 1
+  stty "${TTY_STATE}" </dev/tty || return 5
   TTY_STATE=''
-  cleanup || return 1
-  printf '\n' >/dev/tty
-  if [[ -z "${token}" ]]; then
-    if [[ "${mode}" == replace ]]; then
-      lab_status WARN 'Current token kept; live check still failed.'
-      return 3
-    fi
-    lab_status FAIL 'Empty token; no credential was saved.'
-    return 1
-  fi
+  cleanup || return 5
+  printf '\n' >/dev/tty || return 5
+  if [[ -z "${token}" ]]; then return 5; fi
+  trap 'exit 130' INT # A submitted candidate may commit before interruption.
   if printf '%s' "${token}" | "$@"; then
     unset token
     return 0
+  else
+    status=$?
   fi
+  # A consumer cannot certify that input was never submitted.
+  if (( status == 5 )); then status=1; fi
   unset token
-  lab_print '%s\n' \
-    '[FAIL] Token save failed; existing state kept where possible.' >&2
-  return 1
+  return "${status}"
 }
 
 main "$@"

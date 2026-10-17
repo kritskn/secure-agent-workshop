@@ -7,7 +7,6 @@ reviewed artifact metadata, not an unchecked download or a host installation.
 import hashlib
 import io
 import os
-from pathlib import Path
 import platform
 import runpy
 import shutil
@@ -18,7 +17,7 @@ import tarfile
 import tempfile
 import urllib.parse
 import urllib.request
-
+from pathlib import Path
 
 BINARY = Path("/usr/local/bin/openshell")
 # v0.1.2 release checksums agree with GitHub asset digest metadata.

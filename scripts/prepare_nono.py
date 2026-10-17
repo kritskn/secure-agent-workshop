@@ -5,13 +5,12 @@ integration must include that trusted sibling; no host or personal Pi imports.
 """
 
 import os
-from pathlib import Path
 import platform
 import runpy
 import subprocess
 import sys
 import tarfile
-
+from pathlib import Path
 
 BINARY = Path("/usr/local/bin/nono")
 # nolabs-ai/nono v0.79.0, commit e5ff57f916b528c38ee00d20556d86902215e3d8.

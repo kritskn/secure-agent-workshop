@@ -1,0 +1,28 @@
+version: 1
+filesystem_policy:
+  include_workdir: false
+  read_only: [/usr, /lib, /lib64, /etc, /proc, /dev, /http,
+              /opt/secagent/runtime]
+  read_write: [/tmp]
+landlock:
+  compatibility: hard_requirement
+process:
+  run_as_user: "1000"
+  run_as_group: "1000"
+network_policies:
+  conference_preview_only:
+    endpoints:
+      - host: "@SERVICE_IP@"
+        port: 8080
+        allowed_ips: ["@SERVICE_IP@"]
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow:
+              method: GET
+              path: "/**"
+          - allow:
+              method: POST
+              path: /preview
+    binaries:
+      - path: /usr/local/bin/python3.12

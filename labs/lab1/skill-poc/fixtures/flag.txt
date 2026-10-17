@@ -1,0 +1,1 @@
+FLAG{skills_can_expand_a_greeting}

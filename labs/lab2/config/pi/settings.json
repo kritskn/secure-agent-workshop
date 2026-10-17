@@ -1,0 +1,26 @@
+{
+  "defaultProvider": "ollama",
+  "defaultThinkingLevel": "medium",
+  "defaultTools": [
+    "read",
+    "bash",
+    "edit",
+    "write"
+  ],
+  "defaultProjectTrust": "never",
+  "cacheWarming": "off",
+  "retry": {
+    "enabled": false,
+    "provider": {
+      "timeoutMs": 30000,
+      "maxRetries": 0
+    }
+  },
+  "compaction": {
+    "enabled": false
+  },
+  "enableInstallTelemetry": false,
+  "enableAnalytics": false,
+  "packages": [],
+  "defaultModel": "gemma4:31b"
+}

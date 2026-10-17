@@ -2,13 +2,14 @@
 
 import json
 import os
-from pathlib import Path
 import platform
 import pwd
 import stat
+import subprocess
 import sys
 import tempfile
-
+import types
+from pathlib import Path
 
 MAX_KEY_BYTES = 4096
 CONTAINER_HOME = Path("/home/lab-user")
@@ -63,13 +64,18 @@ def credential_exists(path):
     return True
 
 
-def install(path, *, replace=False):
-    """Save stdin privately; replacement requires an existing safe Ollama key."""
+def install(path, *, verify, replace=False):
+    """Read stdin, verify, then atomically publish a private credential.
+
+    No concurrent setup or external state edits.
+    """
     previous = None
     if replace:
         if not credential_exists(path):
             raise ValueError("No saved credential to replace; run setup first")
         previous = path.lstat()
+    elif os.path.lexists(path):
+        raise ValueError("Credential appeared before enrollment; preserve it")
     raw = sys.stdin.buffer.read(MAX_KEY_BYTES + 1)
     if not raw or len(raw) > MAX_KEY_BYTES:
         raise ValueError("Empty or unsupported token input; no credential saved")
@@ -79,25 +85,33 @@ def install(path, *, replace=False):
         raise ValueError("Unsupported token input; no credential saved") from None
     if not valid_key(key):
         raise ValueError("Empty or unsupported token input; no credential saved")
+    verify(key)
     content = json.dumps({"ollama": {"type": "api_key", "key": key}}) + "\n"
-    if replace:
-        descriptor, name = tempfile.mkstemp(prefix=".auth-", dir=path.parent)
-        temporary = Path(name)
-        try:
-            with os.fdopen(descriptor, "w", encoding="utf-8") as output:
-                output.write(content)
-            # Refuse to overwrite a credential changed since the initial check.
+    descriptor, name = tempfile.mkstemp(prefix=".auth-", dir=path.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+            output.write(content)
+            output.flush()
+            os.fsync(output.fileno())
+        if replace:
+            # Reading auth may update atime; compare identity/content metadata,
+            # not access time. Metadata safety is checked again independently.
+            if not credential_exists(path):
+                raise ValueError("Saved credential disappeared; no replacement attempted")
             current = path.lstat()
-            if not credential_exists(path) or current != previous:
+            fields = ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")
+            if any(getattr(current, field) != getattr(previous, field) for field in fields):
                 raise ValueError("Saved credential changed; no replacement attempted")
             os.replace(temporary, path)
-        finally:
-            temporary.unlink(missing_ok=True)
-    else:
-        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
-        with os.fdopen(os.open(path, flags, 0o600), "w", encoding="utf-8") as output:
-            output.write(content)
-    print("[PASS] Guest Pi Ollama Cloud credential saved privately (not validated online).")
+        else:
+            # Atomic create without overwriting an auth.json that appeared while
+            # verifying. An interruption after this commit can leave both links;
+            # later validation refuses that state rather than silently repairing.
+            os.link(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    print("[PASS] Verified Ollama credential saved privately.")
 
 
 def container_credential_path():
@@ -138,34 +152,47 @@ def check_container_catalog(path):
 
 def main(args=None):
     args = sys.argv[1:] if args is None else args
-    if len(args) != 1 or args[0] not in (
-            "check", "install", "replace", "container-check", "container-install", "container-replace"):
-        print("Usage: python3 setup_guest_auth.py [container-]check|install|replace", file=sys.stderr)
+    # Candidate mode takes checker source, three controllers and four templates.
+    candidate = bool(args) and args[0] in ("container-install", "container-replace")
+    if (not args or (candidate and len(args) != 9)
+            or (not candidate and (len(args) != 1 or args[0] != "container-check"))):
+        print("[FAIL] Expected credential mode and its trusted public verification inputs.", file=sys.stderr)
         return 2
-    container = args[0].startswith("container-")
     mode = args[0].removeprefix("container-")
-    if (platform.system() != "Linux" or os.geteuid() == 0
-            or (not container and platform.node() != "lima-secagent-lab")):
-        print("[FAIL] Run as the ordinary user in the preparation environment.", file=sys.stderr)
-        return 1
+    checker = None
+    previous_umask = os.umask(0o077)
     try:
-        path = container_credential_path() if container else credential_path()
-        if container:
-            check_container_catalog(path)
-        if credential_exists(path) and mode != "replace":
+        path = container_credential_path()
+        check_container_catalog(path)
+        if credential_exists(path) and mode != "replace" and not candidate:
             print("[PASS] Existing private Pi Ollama Cloud credential retained.")
             return 0
         if mode == "check":
             print("[INFO] Workshop Ollama Cloud credential is not configured.")
             return 10
-        install(path, replace=mode == "replace")
-    except (KeyError, OSError, ValueError) as error:
+        checker = types.ModuleType("candidate_check")
+        # Trusted public checkout code, never candidate text.
+        exec(compile(args[1], "check_guest.py", "exec"), checker.__dict__)  # noqa: S102
+        names = (*checker.PROFILE_MODULES, *checker.PROFILE_TEMPLATES)
+        controllers, templates = checker.load_profile_sources(
+            {name: source.encode("utf-8") for name, source in zip(names, args[2:])})
+
+        def verify(key):
+            checker.check_candidate(controllers, templates, key)
+
+        install(path, replace=mode == "replace", verify=verify)
+    except (KeyError, OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
+        if checker is not None and isinstance(error, checker.LiveCheckError):
+            rejected = isinstance(error, checker.CredentialRejectedError)
+            message = ("Candidate rejected for the selected model (401/403)." if rejected
+                       else "Candidate verification incomplete; key not necessarily invalid.")
+            print(f"[FAIL] {message} No candidate saved.", file=sys.stderr)
+            return 4 if rejected else 3
         # Never include the key or raw JSON in diagnostics.
-        if container:
-            print("[FAIL] Preparation credential state/input refused; no repair attempted.", file=sys.stderr)
-        else:
-            print(f"[FAIL] Guest Pi credential setup: {error}", file=sys.stderr)
+        print("[FAIL] Preparation credential state/input refused; no repair attempted.", file=sys.stderr)
         return 1
+    finally:
+        os.umask(previous_umask)
     return 0
 
 

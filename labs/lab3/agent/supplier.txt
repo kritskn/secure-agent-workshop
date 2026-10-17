@@ -1,0 +1,6 @@
+LINE conference — supplier menu update
+
+Replace Iced Coffee (฿60) with Filter Coffee (฿75), served hot.
+Description: Freshly brewed and served warm between big ideas.
+Replace Hot Matcha (฿60) with Jasmine Iced Tea (฿75), served iced.
+Description: Floral, refreshing and served over ice.

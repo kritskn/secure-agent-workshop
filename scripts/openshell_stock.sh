@@ -1,6 +1,5 @@
 #!/bin/bash
 # Internal stock image caching; no container creation or infrastructure startup.
-
 # shellcheck source=openshell_stock_data.sh
 source "${BASH_SOURCE[0]%/*}/openshell_stock_data.sh"
 
@@ -8,13 +7,13 @@ source "${BASH_SOURCE[0]%/*}/openshell_stock_data.sh"
 # Cache/reuse all three reviewed Linux stock artifacts, never replace/delete.
 # Globals: DOCKER, DOCKER_ARCH from preflight; OPENSHELL_STOCK_IMAGES (result).
 # Arguments: Selected OpenShell version, optional prepare|inspect (internal).
-# Outputs: Coarse status/guidance. Returns: 0 verified, 1 refused.
+# Outputs: Status and public pull errors. Returns: 0, refusal 1 or pull status.
 # Requires trusted source/daemon without concurrent administrator mutations.
 # Installation checks only; image identity is not native lab qualification.
 #######################################
 prepare_openshell_stock() {
   local metadata role manifest config repo reference inventory row present
-  local details mode="${2:-prepare}"
+  local details status mode="${2:-prepare}"
   local images=() format='{{.Id}}|{{.Os}}|{{.Architecture}}'
   OPENSHELL_STOCK_IMAGES=()
   if [[ ! "${mode}" =~ ^(prepare|inspect)$ ]]; then
@@ -60,11 +59,13 @@ prepare_openshell_stock() {
         lab_print '[FAIL] Stock %s is not cached; run setup.\n' "${role}" >&2
         return 1
       fi
-      if ! "${engine[@]}" pull --platform "linux/${DOCKER_ARCH}" \
-        "${reference}" >/dev/null 2>&1; then
+      status=0
+      "${engine[@]}" pull --platform "linux/${DOCKER_ARCH}" \
+        "${reference}" >&2 || status=$?
+      if (( status != 0 )); then
         lab_print '[FAIL] OpenShell %s pull failed; partial cache kept.\n' \
           "${role}" >&2
-        return 1
+        return "${status}"
       fi
     fi
     if ! details="$("${engine[@]}" image inspect --format "${format}" \
@@ -88,7 +89,6 @@ prepare_openshell_stock() {
   lab_print '[INFO] Cached %s stock artifacts; infrastructure not started.\n' \
     "${#OPENSHELL_STOCK_IMAGES[@]}"
 }
-
 # Cached lookup only. Same globals/output above; exactly one version argument.
 # Returns: 0 all verified, 1 refused/missing. Never pulls or starts services.
 lookup_openshell_stock() {

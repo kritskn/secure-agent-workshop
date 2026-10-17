@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "theme": "builtin://terminal",
+  "editor": {
+    "line_numbers": true,
+    "relative_line_numbers": false
+  },
+  "check_for_updates": false,
+  "lsp_enabled": false,
+  "orchestrator_mode": true,
+  "terminal": {
+    "resume_agents": false
+  },
+  "plugins": {
+    "welcome_screen": {
+      "enabled": false
+    },
+    "orchestrator": {
+      "settings": {
+        "autoOpenDock": true,
+        "defaultView": "card",
+        "showAllWorktrees": false,
+        "showEmptyWorkspaces": true,
+        "detectionRulesUrl": ""
+      }
+    }
+  }
+}

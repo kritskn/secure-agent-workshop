@@ -1,0 +1,11 @@
+{
+  "defaultProvider": "ollama",
+  "defaultModel": "nemotron-3-super",
+  "defaultThinkingLevel": "medium",
+  "defaultTools": ["read", "bash", "edit", "write"],
+  "defaultProjectTrust": "never",
+  "cacheWarming": "off",
+  "compaction": {"enabled": false},
+  "retry": {"enabled": false, "provider": {"maxRetries": 0}},
+  "enableInstallTelemetry": false
+}

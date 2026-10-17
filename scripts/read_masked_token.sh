@@ -5,7 +5,7 @@
 # Read a masked token; bracketed paste waits for Enter, then trim its edges.
 # Globals: caller's local token (filled), terminal already set to no echo.
 # Arguments: none. Outputs: asterisks/editing to /dev/tty, never raw input.
-# Returns: 0 on Enter, 1 on EOF or unsupported terminal input.
+# Returns: 0 on Enter, 1 on Ctrl-C/EOF or unsupported terminal input.
 #######################################
 read_masked_token() {
   local character sequence paste=0
@@ -13,7 +13,7 @@ read_masked_token() {
   token=''
   while :; do
     IFS= read -r -s -n 1 character </dev/tty || return 1
-    [[ "${character}" != $'\004' ]] || return 1
+    [[ "${character}" != $'\003' && "${character}" != $'\004' ]] || return 1
     if [[ "${character}" == $'\033' ]]; then
       IFS= read -r -s -n 5 -t 1 sequence </dev/tty || return 1
       case "${paste}|${sequence}" in

@@ -3,6 +3,28 @@
 # shellcheck source=lab_format.sh
 source "${BASH_SOURCE[0]%/*}/lab_format.sh"
 
+# Extract output flags after an action, before any tool or state access.
+# Globals: LAB_VERBOSE, LAB_ARGS (outputs). Args: action and its options.
+# Outputs: invalid-option error only. Returns: 0 valid, 2 duplicate verbosity.
+lab_output_options() {
+  LAB_VERBOSE=0
+  LAB_ARGS=("$1")
+  shift
+  local argument
+  for argument in "$@"; do
+    case "${argument}" in
+      -v|--verbose)
+        if (( LAB_VERBOSE )); then
+          lab_status FAIL 'Use -v or --verbose once.'
+          return 2
+        fi
+        LAB_VERBOSE=1
+        ;;
+      *) LAB_ARGS+=("${argument}") ;;
+    esac
+  done
+}
+
 # Print text and optional ending together, with terminal-only colour/clearing.
 # Globals: TERM, NO_COLOR, LAB_WORK_PID. Args: colour, text, fd=1, ending=''.
 # Outputs: requested stream; plain for pipes/NO_COLOR/dumb. Returns: printf.
@@ -43,16 +65,22 @@ lab_status() {
 }
 
 # Animate until terminated; reap each short sleep before clearing the line.
-# Globals: LAB_WORK_WORD. Args: title. Outputs: stdout. Returns: 0 on TERM.
+# Globals: LAB_WORK_WORD. Args: title, optional style. Outputs: stdout.
+# Returns: 0 on TERM; EXIT clears the animation.
 lab_spin() {
-  local frame
+  local frame delay=0.1
+  local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+  if [[ "${2:-}" == robot ]]; then
+    frames=('(O_O) /' '(0_0) —' "(-_-) \\")
+    delay=0.2
+  fi
   trap 'exit 0' TERM
   trap 'printf "\r\033[2K"' EXIT
   while :; do
-    for frame in '⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏'; do
+    for frame in "${frames[@]}"; do
       printf '\r\033[2K\033[36m%s %s %s\033[0m' \
         "${frame}" "${LAB_WORK_WORD:-Working...}" "$1"
-      sleep 0.1 || return $?
+      sleep "${delay}" || return $?
     done
   done
 }

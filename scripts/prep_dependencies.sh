@@ -16,25 +16,29 @@ source "${BASH_SOURCE[0]%/*}/openshell_stock.sh"
 # Globals: publishes checked DOCKER/DOCKER_ARCH and existing helper image IDs,
 #   pins and OPENSHELL_STOCK_IMAGES; LAB_SETUP_BRIEF hides success details.
 #   Image/pin results clear on failure.
-# Arguments: trusted project directory. Outputs: progress and fixed results.
-# Returns: 0 complete, 1 stopped. Completed image/cache work is always retained.
+# Arguments: project, optional cache|no-cache. Outputs: progress/results.
+# Returns: 0 complete, delegated failure status or 1 for invalid arguments.
+# Completed image/cache work is always retained.
 # No private HOME, enrollment, model request, lab service or cleanup action.
 # Real invocation may build/pull dependencies; tests use mocks only.
 #######################################
 prepare_prep_dependencies() {
-  local project="${1:-}"
+  local project="${1:-}" cache="${2:-cache}" status
   RUNTIME_IMAGE_ID='' NONO_IMAGE_ID='' OPENSHELL_IMAGE_ID=''
   PI_VERSION='' NONO_VERSION='' OPENSHELL_VERSION=''
   OPENSHELL_STOCK_IMAGES=()
-  if (( $# != 1 )) || [[ -z "${project}" ]]; then
+  if (( $# < 1 || $# > 2 )) || [[ -z "${project}" \
+    || ! "${cache}" =~ ^(cache|no-cache)$ ]]; then
     lab_print '%s\n' '[FAIL] Expected the preparation project directory.' >&2
     return 1
   fi
   if lab_work 'Docker' check_docker_host \
-    && lab_work 'Pi runtime' prepare_runtime_image "${project}" \
+    && lab_work 'Pi runtime' prepare_runtime_image \
+      "${project}" prepare "${cache}" \
     && lab_work 'Selected versions' load_prep_versions "${project}" \
-    && lab_work 'nono' prepare_nono_image "${project}" \
-    && lab_work 'OpenShell' prepare_openshell_image "${project}" \
+    && lab_work 'nono' prepare_nono_image "${project}" prepare "${cache}" \
+    && lab_work 'OpenShell' prepare_openshell_image \
+      "${project}" prepare "${cache}" \
     && lab_work 'Stock images' prepare_openshell_stock "${OPENSHELL_VERSION}" \
     && lab_work 'nono CLI' check_dependency_cli "${project}" nono \
       "${NONO_VERSION}" \
@@ -44,6 +48,8 @@ prepare_prep_dependencies() {
       '[PASS] Dependency cache ready; nono/OpenShell CLI checks passed.' \
       '[INFO] Private HOME, provider access and lab readiness not checked.'
     return 0
+  else
+    status=$?
   fi
   RUNTIME_IMAGE_ID='' NONO_IMAGE_ID='' OPENSHELL_IMAGE_ID=''
   PI_VERSION='' NONO_VERSION='' OPENSHELL_VERSION=''
@@ -52,5 +58,5 @@ prepare_prep_dependencies() {
     lab_print '%s\n' \
       '[FAIL] Dependency preparation stopped; completed cache kept.' >&2
   fi
-  return 1
+  return "${status}"
 }

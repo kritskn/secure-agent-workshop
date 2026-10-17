@@ -1,7 +1,11 @@
 {{- .Id -}}|{{- .Os -}}|{{- .Architecture -}}|
 {{- with index . "Config" -}}
 {{- with index . "Labels" -}}
-  {{- index . "org.secagent.prep.source-sha256" -}}
+  {{- if and
+      (eq (index . "org.secagent.owner") "secure-agent-workshop")
+      (eq (index . "org.secagent.role") "preparation-nono") -}}
+    owned
+  {{- end -}}
 {{- end -}}|
 {{- if and (eq (index . "User") "1000:1000")
     (eq (index . "WorkingDir") "/home/lab-user")

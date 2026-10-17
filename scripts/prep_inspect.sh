@@ -24,7 +24,7 @@ inspect_prep_image() {
   fi
   format="$(< "${file}")"
   pattern="^${RUNTIME_IMAGE_ID}\|linux\|${DOCKER_ARCH}"
-  pattern+='\|[0-9a-f]{64}\|ok\|ok\|ok$'
+  pattern+='\|owned\|ok\|ok\|ok$'
   if ! details="$("${DOCKER[@]}" image inspect --format "${format}" \
     "${RUNTIME_IMAGE_ID}" 2>/dev/null)" \
     || [[ ! "${details}" =~ ${pattern} ]]; then

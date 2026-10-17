@@ -1,0 +1,37 @@
+{
+  "id": "lab3-ollama",
+  "display_name": "Lab 3 Ollama Cloud",
+  "category": "inference",
+  "inference_capable": true,
+  "credentials": [
+    {
+      "name": "api_key",
+      "env_vars": [
+        "LAB3_OLLAMA_API_KEY"
+      ],
+      "required": true,
+      "auth_style": "bearer",
+      "header_name": "authorization"
+    }
+  ],
+  "endpoints": [
+    {
+      "host": "ollama.com",
+      "port": 443,
+      "path": "/v1/chat/completions",
+      "protocol": "rest",
+      "enforcement": "enforce",
+      "rules": [
+        {
+          "allow": {
+            "method": "POST",
+            "path": "/v1/chat/completions"
+          }
+        }
+      ]
+    }
+  ],
+  "binaries": [
+    "/opt/secagent/runtime/bin/node"
+  ]
+}

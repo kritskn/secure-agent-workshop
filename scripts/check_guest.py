@@ -1,28 +1,21 @@
-"""Shared guest prerequisites plus an explicit live Pi/provider/log probe.
+"""Container preparation checks and explicit Pi/provider/log verification.
 
-check_lab.sh streams trusted validators and configuration as tar archives on
-stdin. Load them in memory, never extract or run installer entry points. The
-privileged invocation inspects tooling/runtime without repair or startup.
+Host adapters stream trusted public controllers and configuration. Load them in
+memory, never extract or run installer entry points. The container entry is
+offline-only: read-only private profile/auth validation and sealed Node/npm/Pi
+version probes. Its adapter enforces network-none and a read-only HOME mount.
 
-After prerequisites pass, the unprivileged `pi` invocation uses setup's exact
-operator/profile/auth validators, then one explicit model turn and fresh log
-verification. It reads the saved guest key locally, leaves a private activity
-log and uses provider quota (possibly billable). No credential content, raw Pi
-output or log bodies are printed or transported to the host. The prompt uses
-no participant files/tools and the temporary working directory is removed.
-
-The separate `container` entry is offline-only: read-only private profile/auth
-validation and sealed Node/npm/Pi version probes, with no installer or model call.
-Its host adapter enforces network-none and a read-only preparation HOME mount.
-The explicit `container-live` entry first runs those prerequisites, then one
-existing live probe under a private umask. Its adapter enables networking and
-private scratch/HOME writes; cancellation is not rollback or remote-stop proof.
+The container-live entry first checks prerequisites, then makes one explicit
+provider request and verifies its fresh log under a private umask. Candidate
+verification uses scratch profile state and never saves a key itself. Requests
+use provider quota and may cost. No credential content, raw Pi output or log
+bodies are printed or transported to the host. Cancellation is not rollback or
+proof that an already-sent request stopped.
 """
 
 import io
 import json
 import os
-from pathlib import Path
 import platform
 import pwd
 import re
@@ -33,10 +26,15 @@ import tarfile
 import tempfile
 import types
 import uuid
+from pathlib import Path
 
 
 class LiveCheckError(RuntimeError):
     """A live turn or its log failed after all prerequisite/profile/catalog guards."""
+
+
+class CredentialRejectedError(LiveCheckError):
+    """The selected provider/model reported HTTP 401/403 during a live turn."""
 
 
 PROFILE_MODULES = {"scripts/prepare_guest.py": "prepare_guest",
@@ -44,25 +42,6 @@ PROFILE_MODULES = {"scripts/prepare_guest.py": "prepare_guest",
                    "scripts/setup_guest_auth.py": "setup_guest_auth"}
 PROFILE_TEMPLATES = ("agents/pi/settings.json", "agents/pi/models.json",
                      "agents/pi/extensions/observer.ts", "scripts/runtime_config.json")
-
-
-def load_validators(stream):
-    """Load trusted validators/config in memory, never installer entry points."""
-    modules = []
-    with tarfile.open(fileobj=io.BytesIO(stream.read())) as archive:
-        for name in ("prepare_guest", "prepare_guest_docker", "setup_guest_pi"):
-            source = archive.extractfile(name + ".py")
-            if source is None:
-                raise RuntimeError(f"Missing validator source: {name}")
-            module = types.ModuleType(name)
-            sys.modules[name] = module
-            exec(compile(source.read(), name + ".py", "exec"), module.__dict__)
-            modules.append(module)
-        source = archive.extractfile("runtime_config.json")
-        if source is None:
-            raise RuntimeError("Missing runtime configuration")
-        config = modules.pop().load_runtime_config(source.read())
-    return (*modules, config)
 
 
 def load_profile_controllers(stream):
@@ -90,12 +69,20 @@ def load_profile_controllers(stream):
             members[member.name] = archive.extractfile(member).read()
     if set(members) != set(expected):
         raise RuntimeError("Checker archive is missing expected sources")
+    return load_profile_sources(members)
+
+
+def load_profile_sources(members):
+    """Load the same trusted public inputs from tar or candidate argv transport."""
+    if (set(members) != set(PROFILE_MODULES) | set(PROFILE_TEMPLATES)
+            or any(not 0 < len(data) <= 2 * 1024 * 1024 for data in members.values())):
+        raise ValueError("Incomplete or oversized public profile inputs")
     controllers = {}
     for name, alias in PROFILE_MODULES.items():
         module = types.ModuleType(alias)
         sys.modules[alias] = module
         try:
-            exec(compile(members[name], name + ".py", "exec"), module.__dict__)
+            exec(compile(members[name], name + ".py", "exec"), module.__dict__)  # noqa: S102 - Bounded trusted public controllers, not configuration.
         except SyntaxError as error:
             raise RuntimeError(f"Corrupt checker source {name}: {error}") from None
         controllers[name] = module
@@ -103,56 +90,23 @@ def load_profile_controllers(stream):
     return controllers, templates
 
 
-def check(guest, docker, config):
-    architecture = guest.check_guest()
-    # These version/info commands need no personal HOME/config. /proc/self
-    # exists but cannot acquire configuration files, even when running as root.
-    environment = {
-        "HOME": "/proc/self", "DOCKER_CONFIG": "/proc/self",
-        "PATH": f"{guest.RUNTIME / 'bin'}:/usr/sbin:/usr/bin:/sbin:/bin",
-        "LC_ALL": "C", "PI_OFFLINE": "1", "PI_TELEMETRY": "0",
-    }
-    for name in docker.CONFLICTS:
-        if docker.package_version(name, environment) is not None:
-            raise RuntimeError(f"Conflicting {name}; review without automatic migration")
-    for name, expected in docker.PACKAGES.items():
-        actual = docker.package_version(name, environment)
-        if actual != expected:
-            raise RuntimeError(f"{name}: expected {expected}, found {actual or 'not installed'}")
-    docker.verify_docker(environment)
-    print("[PASS] Pinned Docker/Compose and active rootful guest Engine.", flush=True)
-
-    for name in ("ca-certificates", "git"):
-        if docker.package_version(name, environment) is None:
-            raise RuntimeError(f"Missing guest package: {name}")
-    guest.require_root_owned(guest.INSTALL_ROOT)
-    guest.require_root_owned(guest.RUNTIME)
-    guest.verify_runtime_manifest(guest.RUNTIME, architecture, config["pi"])
-    guest.verify_runtime(guest.RUNTIME, environment, Path("/"), config["pi"])
-    print("[PASS] Pinned, root-owned Node/npm/pi runtime and required guest packages.", flush=True)
-
-
-def check_pi(pi, auth, templates, *, container=False):
+def check_pi(pi, auth, templates, *, require_credential=True):
     """Unprivileged read-only checks using setup's profile compatibility rules."""
-    if platform.system() != "Linux" or (not container and platform.node() != "lima-secagent-lab"):
+    if platform.system() != "Linux":
         raise RuntimeError(
-            "Run ./lab.sh check from the host; guest Pi checks run only inside secagent-lab")
+            "Run ./lab.sh check from the host; Pi checks require the preparation container")
     if os.geteuid() == 0:
         raise RuntimeError(
             "Guest Pi checks must run as the ordinary guest operator, not sudo/root")
-    # Container mode keeps and validates the fixed HOME; legacy Lima resolves it
-    # from passwd. Neither mode creates or completes a missing profile.
+    # Validate the fixed container HOME; never create or complete a missing profile.
     pi.load_runtime_config(templates["scripts/runtime_config.json"])
     expected_settings = pi.render_settings(templates["agents/pi/settings.json"])
     uid = os.geteuid()
     home = Path(pwd.getpwuid(uid).pw_dir)
     if not home.is_absolute():
         raise ValueError(f"Guest home must be absolute: {home}")
-    if container:
-        auth.container_credential_path()
-        pi.validate_container_home(home, uid, os.getegid())
-    else:
-        os.environ["HOME"] = str(home)
+    auth.container_credential_path()
+    pi.validate_container_home(home, uid, os.getegid())
     profile = home / ".pi/agent"
 
     # Setup's reuse helpers allow absence; check requires the installed state.
@@ -194,27 +148,28 @@ def check_pi(pi, auth, templates, *, container=False):
     # and apply setup's strict private-file rules. The credential is read and
     # parsed only inside the guest; it is never printed or sent to the host.
     credential = auth.credential_path()
-    if container:
-        auth.check_container_catalog(credential)
-    if not auth.credential_exists(credential):
+    auth.check_container_catalog(credential)
+    saved = auth.credential_exists(credential)
+    if require_credential and not saved:
         raise RuntimeError("Guest Pi credential is missing; "
                            "run ./lab.sh setup to enter it interactively")
     print("[PASS] Guest Pi profile, observer extension, log directory and inventory "
           "are compatible with workshop requirements.", flush=True)
-    print("[PASS] Guest Pi saved Ollama Cloud credential configuration is present with "
-          "the strict expected structure; its contents are never printed or sent "
-          "to the host.")
+    if saved:
+        print("[PASS] Guest Pi saved Ollama Cloud credential configuration is present with "
+              "the strict expected structure; its contents are never printed or sent "
+              "to the host.")
     print("[INFO] This verifies configured files, not observer execution, log "
           "writability, token validity or lab readiness.", flush=True)
     return home, json.loads(expected_settings)["defaultModel"]
 
 
-def check_container(controllers, templates):
+def check_container(controllers, templates, *, require_credential=True):
     """Read-only common Pi readiness, never provisioning or a provider request."""
     runtime = controllers["scripts/prepare_guest.py"]
     pi = controllers["scripts/setup_guest_pi.py"]
     auth = controllers["scripts/setup_guest_auth.py"]
-    check_pi(pi, auth, templates, container=True)
+    home, model = check_pi(pi, auth, templates, require_credential=require_credential)
     config = pi.load_runtime_config(templates["scripts/runtime_config.json"])
     architecture = platform.machine()
     if architecture not in runtime.NODE_IMAGES:
@@ -234,6 +189,33 @@ def check_container(controllers, templates):
     }
     runtime.verify_runtime(runtime.RUNTIME, environment, Path("/tmp"), config["pi"])
     print("[PASS] Offline Node/npm/Pi versions and private profile checked.", flush=True)
+    return home, model
+
+
+def check_candidate(controllers, templates, key):
+    """Verify one stdin candidate in container scratch, never save it to HOME.
+
+    Only absence of saved auth is allowed for enrollment. Present unsafe auth,
+    HOME, profile, catalog and runtime still fail before any provider request.
+    The host supplies /tmp tmpfs; no saved key/session/cache is copied here.
+    """
+    home, model = check_container(controllers, templates, require_credential=False)
+    pi = controllers["scripts/setup_guest_pi.py"]
+    auth = controllers["scripts/setup_guest_auth.py"]
+    if not auth.valid_key(key):
+        raise ValueError("Unsupported candidate input")
+    with tempfile.TemporaryDirectory(prefix="secagent-candidate-", dir="/tmp") as scratch:
+        profile = Path(scratch)
+        (profile / "extensions").mkdir(mode=0o700)
+        for name, content in (
+                ("settings.json", pi.render_settings(templates["agents/pi/settings.json"])),
+                ("models.json", templates["agents/pi/models.json"]),
+                ("extensions/observer.ts", templates["agents/pi/extensions/observer.ts"]),
+                ("auth.json", json.dumps({"ollama": {"type": "api_key", "key": key}}).encode())):
+            pi.create_file(profile / name, content)
+        run_live_probe(controllers["scripts/prepare_guest.py"].RUNTIME, home, profile, model)
+    # Recheck real HOME/profile safety before the caller attempts persistence.
+    check_pi(pi, auth, templates, require_credential=False)
 
 
 def main_container():
@@ -257,7 +239,10 @@ def main_container_live():
         try:
             check_live(controllers["scripts/prepare_guest.py"].RUNTIME,
                        controllers["scripts/setup_guest_pi.py"],
-                       controllers["scripts/setup_guest_auth.py"], templates, container=True)
+                       controllers["scripts/setup_guest_auth.py"], templates)
+        except CredentialRejectedError:
+            print("[FAIL] Credential rejected for the selected model (401/403).", file=sys.stderr)
+            return 4
         except LiveCheckError:
             print("[FAIL] Live request/log verification failed; no automatic retry.", file=sys.stderr)
             return 3
@@ -355,21 +340,26 @@ def verify_activity_log(directory, before, session_id, model, prompt):
     return path
 
 
-def check_live(runtime, pi, auth, templates, *, container=False):
-    """One explicit guest model turn plus observer proof; caller verifies runtime.
+def check_live(runtime, pi, auth, templates):
+    """Validate the saved profile/auth, then probe once; caller verifies runtime."""
+    home, model = check_pi(pi, auth, templates)
+    return run_live_probe(runtime, home, home / ".pi/agent", model)
 
-    Reuse setup's operator/profile/auth guards first. Run only the installed
-    observer in an empty disposable workdir with no tools or project context.
-    Keep credentials, raw CLI output and log bodies inside the guest. Fixed
-    profile settings disable retries/compaction/cache warming; no settings are
-    changed here. PI_OFFLINE disables automatic catalog/update networking, not
-    this explicitly requested provider call. JSON mode can exit zero on a model
-    error, so require an authoritative completed reply AND agent_settled.
-    Probe only the configured default, never the alternative as a fallback.
-    The fresh request log must show thinking enabled (medium maps to on).
+
+def run_live_probe(runtime, home, profile, model):
+    """Probe with an explicit validated agent directory; log under home/pi-log.
+
+    Internal runner, not a validation bypass or a public entry point. Caller
+    validates runtime, HOME, profile, credential and provider/model selection.
+    Run only the selected profile's observer in an empty disposable workdir,
+    with no tools or project context. Keep credentials and raw output inside
+    the guest. Validated settings disable retries/compaction/cache warming.
+    No credentials or settings are changed here. PI_OFFLINE disables automatic
+    networking, not this explicit request. JSON mode can exit zero on a model
+    error, so require a completed exact-model reply AND agent_settled, plus a
+    fresh correlated observer log showing thinking enabled. Never fall back to
+    another profile or model.
     """
-    home, model = check_pi(pi, auth, templates, container=container)
-    profile = home / ".pi/agent"
     environment = {
         "HOME": str(home), "PI_CODING_AGENT_DIR": str(profile),
         "PATH": f"{runtime / 'bin'}:/usr/bin:/bin", "LC_ALL": "C.UTF-8",
@@ -391,7 +381,7 @@ def check_live(runtime, pi, auth, templates, *, container=False):
                 return subprocess.run(arguments, env=environment, cwd=work,
                                       stdin=subprocess.DEVNULL, capture_output=True,
                                       text=True, encoding="utf-8", errors="replace",
-                                      timeout=timeout)
+                                      timeout=timeout, check=False)
             except subprocess.TimeoutExpired:
                 raise RuntimeError("Pi live check timed out; check connectivity and provider availability.") from None
 
@@ -411,6 +401,8 @@ def check_live(runtime, pi, auth, templates, *, container=False):
                           "--extension", str(profile / "extensions/observer.ts"),
                           "--", prompt], 45)
             return verify_live_result(result, directory, before, model, prompt)
+        except CredentialRejectedError:
+            raise
         except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
             raise LiveCheckError(str(error)) from None
 
@@ -451,10 +443,10 @@ def verify_live_result(result, directory, before, model, prompt):
     failure = ("Ollama Cloud request did not complete successfully; check connectivity, "
                "your API key/account, configured model availability and quota. "
                "Raw provider diagnostics are not displayed.")
-    def fail(category):
+    def fail(category, error_type=RuntimeError):
         # Only fixed labels, counts and the local process status leave the guest.
         # Never interpolate provider fields, stderr, errorMessage or reply text.
-        raise RuntimeError(f"{failure} Failure category: {category}.")
+        raise error_type(f"{failure} Failure category: {category}.")
 
     if result.returncode:
         fail(f"Pi exit status {result.returncode}")
@@ -473,7 +465,10 @@ def verify_live_result(result, directory, before, model, prompt):
     reason = reply.get("stopReason")
     if reason == "error":
         category = classify_provider_error(reply.get("errorMessage"))
-        fail(f"assistant stop reason=error. SDK category: {category}")
+        rejected = (category in {"reported HTTP status 401", "reported HTTP status 403"}
+                    and reply.get("provider") == "ollama" and reply.get("model") == model)
+        fail(f"assistant stop reason=error. SDK category: {category}",
+             CredentialRejectedError if rejected else RuntimeError)
     if reason != "stop":
         # A provider-controlled string (or malformed value) is never echoed.
         known = reason if isinstance(reason, str) and reason in (
@@ -497,69 +492,10 @@ def verify_live_result(result, directory, before, model, prompt):
     return path
 
 
-def check_report(error, context):
-    print(f"[FAIL] {context}: {error}", file=sys.stderr)
-    if isinstance(error, subprocess.CalledProcessError) and error.stderr:
-        print(error.stderr.strip(), file=sys.stderr)
-
-
-TOOLING_GUIDANCE = (
-    "For missing tools, run ./lab.sh setup from the macOS host.\n"
-    "For incompatible OS/configuration/versions or cloud-init errors,\n"
-    "review the reported problem first; setup will not migrate/replace them.\n"
-    "Inspect cloud-init with: limactl shell secagent-lab -- "
-    "cloud-init status --long\n"
-    "Inspect Docker with: limactl shell secagent-lab -- "
-    "sudo -n -k systemctl status docker --no-pager"
-)
-
-PI_GUIDANCE = (
-    "For missing tools or resources, run ./lab.sh setup from the macOS host.\n"
-    "For changed, unexpected or unsafe Pi profile, logs or auth files, review\n"
-    "the reported problem first; setup preserves them and never repairs,\n"
-    "replaces or re-enters credentials without the participant explicitly\n"
-    "running setup. No credential content is transported or printed by checks."
-)
-
-
-def main():
-    guest = None
-    try:
-        guest, docker, config = load_validators(sys.stdin.buffer)
-        check(guest, docker, config)
-    except (OSError, RuntimeError, ValueError, KeyError,
-            subprocess.SubprocessError, tarfile.TarError) as error:
-        check_report(error, "Guest prerequisite check")
-        # A known runtime mismatch already supplies its complete recovery path.
-        if guest is None or not isinstance(error, guest.RuntimeMismatchError):
-            print(TOOLING_GUIDANCE, file=sys.stderr)
-        return 1
-    return 0
-
-
-def main_pi():
-    """Unprivileged entry: profile/auth validators and templates stream on stdin."""
-    try:
-        controllers, templates = load_profile_controllers(sys.stdin.buffer)
-        check_live(controllers["scripts/prepare_guest.py"].RUNTIME,
-                   controllers["scripts/setup_guest_pi.py"],
-                   controllers["scripts/setup_guest_auth.py"], templates)
-    except (OSError, RuntimeError, ValueError, KeyError,
-            subprocess.SubprocessError, tarfile.TarError) as error:
-        print(f"[FAIL] Guest Pi live check: {error}", file=sys.stderr)
-        print(PI_GUIDANCE, file=sys.stderr)
-        return 3 if isinstance(error, LiveCheckError) else 1
-    return 0
-
-
 if __name__ == "__main__":
     if sys.argv[1:] == ["container-live"]:
         sys.exit(main_container_live())
     if sys.argv[1:] == ["container"]:
         sys.exit(main_container())
-    if sys.argv[1:] == ["pi"]:
-        sys.exit(main_pi())
-    if sys.argv[1:]:
-        print("Usage: python3 -I -B check_guest.py [pi|container|container-live]", file=sys.stderr)
-        sys.exit(2)
-    sys.exit(main())
+    print("Usage: python3 -I -B check_guest.py container|container-live", file=sys.stderr)
+    sys.exit(2)

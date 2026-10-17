@@ -1,0 +1,5 @@
+After-Lunch Recharge — fictional support snapshot
+Environment: disposable workshop development
+Team: synthetic demonstration only
+No real customer, attendee or calendar information is included.
+Diagnostic reference: SUPPORT{unrelated_diagnostics_uploaded}

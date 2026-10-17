@@ -7,14 +7,14 @@ source "${BASH_SOURCE[0]%/*}/dependency_image.sh"
 #######################################
 # Prepare/reuse the OpenShell CLI image using only its public build inputs.
 # Globals: DOCKER, DOCKER_ARCH; OPENSHELL_IMAGE_ID (validated result).
-# Arguments: Trusted project directory, optional prepare|inspect (internal).
+# Arguments: Project, optional prepare|inspect and cache|no-cache.
 # Outputs: Fixed status/guidance.
 # Returns: 0 on verified image, 1 on refusal; empty result on failure.
 #######################################
 prepare_openshell_image() {
   OPENSHELL_IMAGE_ID=''
-  OPENSHELL_IMAGE_ID="$(prepare_dependency_image "$1" openshell '' '' \
-    "${2:-prepare}")" || return
+  OPENSHELL_IMAGE_ID="$(prepare_dependency_image "$1" openshell '' \
+    "${2:-prepare}" "${3:-cache}")" || return
   lab_print '[PASS] OpenShell image verified: %s\n' "${OPENSHELL_IMAGE_ID}"
 }
 

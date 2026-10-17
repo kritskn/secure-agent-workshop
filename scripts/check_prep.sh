@@ -2,26 +2,17 @@
 # Common Pi checks; provisioning, prompting and retries belong to no check mode.
 # shellcheck source=prep_inspect.sh
 source "${BASH_SOURCE[0]%/*}/prep_inspect.sh"
-
 # Check offline readiness. Globals: checked DOCKER/arch/runtime ID.
 # Args: project. Outputs: fixed status. Returns: 0 pass, 1 failure.
-check_prep_runtime() {
-  run_prep_check offline "$@"
-}
+check_prep_runtime() { run_prep_check offline "$@"; }
 
-# Explicit live request/log check, including offline prerequisites.
-# Globals: checked DOCKER/arch/runtime ID. Args: project. Outputs: fixed status.
-# Returns: 0 pass, 3 live failure, 1 prerequisites/transport failure; no retry.
-check_prep_live() {
-  run_prep_check live "$@"
-}
+# Live check. Globals: DOCKER/arch/runtime ID. Args: project. Output: status.
+# Returns: 0 pass, 4 key rejected, 3 other live error, 1 prerequisite/I/O.
+check_prep_live() { run_prep_check live "$@"; }
 
-#######################################
 # Shared transport. Globals: DOCKER, DOCKER_ARCH, RUNTIME_IMAGE_ID.
 # Args: offline|live, trusted project. Outputs/returns: as wrappers above.
-# No image selection/build/pull, HOME repair, prompt or lab service startup.
-# Trusted checkout/daemon; no concurrent setup or state edits.
-#######################################
+# No builds, repairs, prompts or retries. Trusted source/daemon; no state edits.
 run_prep_check() {
   local mode="${1:-}" project="${2:-}" file source status entry=container
   local home_mount='type=volume,src=secagent-vol,dst=/home/lab-user'
@@ -72,7 +63,7 @@ run_prep_check() {
         --mount "${home_mount}" \
         -i "${RUNTIME_IMAGE_ID}" python3 -I -B -c "${source}" "${entry}" \
         >/dev/null 2>&1
-    # A tar failure must not become an eligible live retry, even if Docker is 3.
+    # Packaging failure overrides guest status, including credential rejection.
     local codes=("${PIPESTATUS[@]}")
     if (( codes[0] != 0 )); then
       exit 1
@@ -89,12 +80,9 @@ run_prep_check() {
     return 0
   else
     status=$?
-    if [[ "${mode}" == live ]] && (( status == 3 )); then
-      lab_status FAIL 'Could not verify the Ollama response or activity log.'
-      return 3
-    fi
-    lab_print '%s\n' \
-      '[FAIL] Preparation prerequisite/transport check failed; state kept.' >&2
-    return 1
+    case "${mode}:${status}" in
+      live:3|live:4) return "${status}" ;;
+      *) return 1 ;;
+    esac
   fi
 }

@@ -18,7 +18,7 @@ lab_stop_work() {
 
 #######################################
 # Run noninteractive work in this shell, preserving globals and exit status.
-# Globals: LAB_WORK_PID/TITLE/WORD, TERM, NO_COLOR; command publishes globals.
+# Globals: LAB_WORK_PID/TITLE/WORD/STYLE, TERM, NO_COLOR; command globals.
 # Arguments: label, function/command, arguments. Outputs: unbuffered originals.
 # Returns: delegated status. No animation on pipes, dumb terminals or NO_COLOR.
 # Caller installs lab_stop_work EXIT/signal cleanup; no traps replaced here.
@@ -28,7 +28,7 @@ lab_work() {
   shift
   if [[ -t 1 && -t 2 && -z "${NO_COLOR+x}" \
     && "${TERM:-dumb}" =~ ^(xterm|screen|tmux|rxvt|vt100) ]]; then
-    lab_spin "${title}" &
+    lab_spin "${title}" "${LAB_WORK_STYLE:-}" &
     LAB_WORK_PID=$!
   fi
   "$@" || status=$?

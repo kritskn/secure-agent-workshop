@@ -1,6 +1,24 @@
 #!/bin/bash
 # Format public CLI lines; brief preparation hides details, not failures.
 
+# Render shared help with terminal-only headings and command accents.
+# Globals: TERM, NO_COLOR. Args: lines. Outputs: stdout. Returns: printf status.
+help_lines() {
+  local line colour
+  for line in "$@"; do
+    colour=''
+    case "${line}" in
+      'Usage:'*|Requirements|'Ollama Cloud'|'Next steps') colour='1;36' ;;
+      '  setup '*|'  check '*|'  remove '*|'  help '*|'  ./lab.sh '*|\
+      '  lab1 '*|'  lab2 '*|'  lab3 '*|'  build-labs '*|\
+      '  run-pipeline '*|'  enter '*|'  stop '*|'  reset '*)
+        colour='32'
+        ;;
+    esac
+    lab_text "${colour}" "${line}" 1 $'\n' || return
+  done
+}
+
 # Select public lines during preparation's internal, scoped brief view.
 # Globals: LAB_SETUP_BRIEF. Args: line. Outputs: none. Returns: 0 show, 1 hide.
 lab_line_visible() {
@@ -32,6 +50,7 @@ lab_print() {
       '[PASS] '*) colour='32' ;;
       '[FAIL] '*) colour='31' ;;
       '[WARN] '*) colour='33' ;;
+      '[NEXT] '*) colour='1;33' ;;
       '[INFO] '*) colour='36' ;;
       '[HELP] '*|'[SUGGESTED FIX]') colour='34' ;;
     esac

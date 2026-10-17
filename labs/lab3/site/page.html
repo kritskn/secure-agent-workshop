@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>$stage_label — After-lunch recharge</title>
+<script src="/local-time.js" defer></script>
+<style>
+:root {
+  color-scheme: dark;
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  --bg: #0a0b10; --ink: #f5f7ff; --muted: #a3adc2;
+  --green: #00e676; --blue: #2979ff; --purple: #b388ff;
+  --border: rgba(255,255,255,.12);
+  --gradient: linear-gradient(120deg, var(--green), var(--blue));
+  color: var(--ink); background: var(--bg);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; min-height: 100vh; --stage-accent: var(--green);
+  background: radial-gradient(ellipse at 10% 28%, #00e6760b, transparent 45%),
+              radial-gradient(ellipse at 92% 50%, #2979ff13, transparent 45%);
+}
+body.preview { --stage-accent: var(--purple); }
+.wrap { width: min(1080px, calc(100% - 40px)); margin: auto; }
+.topbar { display: flex; justify-content: space-between; align-items: center;
+  gap: 16px; padding: 24px 0; border-bottom: 1px solid var(--border); }
+.conference { font-size: .85rem; font-weight: 850; letter-spacing: .04em; }
+.conference span { color: var(--green); }
+.pill { padding: 5px 11px; border: 1px solid var(--border); border-radius: 30px;
+  font-size: .66rem; letter-spacing: .1em; font-weight: 750; text-transform: uppercase; }
+.hero { text-align: center; padding: 30px 0 24px; }
+.eyebrow { color: var(--purple); font-size: .7rem; letter-spacing: .2em;
+  font-weight: 800; margin: 0 0 10px; }
+h1 { margin: 0; font-size: clamp(2.5rem, 6vw, 4.5rem); line-height: 1.02;
+  font-weight: 900; letter-spacing: -.055em; }
+h1 span { background: var(--gradient); background-clip: text;
+  -webkit-background-clip: text; color: transparent; }
+.lead { color: var(--muted); margin: 14px 0 0; }
+.stage { margin-bottom: 24px; padding: 16px 20px; border-radius: 13px;
+  border: 1px solid var(--stage-accent); background: #ffffff05;
+  color: var(--stage-accent); font-size: clamp(18px, 3vw, 26px);
+  font-weight: 850; letter-spacing: .08em; text-align: center; }
+.menu { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.team-card { --team-accent: #ffc288; --team-glow: #ef9c3820;
+  position: relative; overflow: hidden; border: 1px solid var(--border);
+  border-radius: 22px; background: #ffffff05; }
+.team-card[data-team="tea"] { --team-accent: #aceda1; --team-glow: #00e67618; }
+.team-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 3px; background: linear-gradient(90deg, var(--team-accent), transparent); }
+.team-head { display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 21px 24px 0; }
+.team-name { margin: 0; font-size: .9rem; letter-spacing: .12em;
+  font-weight: 850; color: var(--team-accent); }
+.badge { padding: 4px 9px; border-radius: 30px; color: #ffd197;
+  background: #ffb04d19; font-size: .65rem; font-weight: 800; letter-spacing: .08em; }
+.team-card.changed { border-color: #ffc28875; }
+.drink-scene { position: relative; height: 190px; display: grid;
+  place-items: center; margin: 2px 0 0; }
+.drink-scene::before { content: ''; position: absolute; width: 190px; height: 150px;
+  border-radius: 50%; background: var(--team-glow); filter: blur(25px); }
+.drink-art { position: relative; width: 220px; height: 210px; overflow: visible;
+  --liquid: #936039; --dark-liquid: #56331f; --label: #fce0b3;
+  --coffee-symbol: inline; --tea-symbol: none; --ice: none; --steam: inline; }
+.drink-art[data-drink="tea"] { --liquid: #9dc967; --dark-liquid: #557d38;
+  --label: #efffdb; --coffee-symbol: none; --tea-symbol: inline; }
+.drink-art[data-temperature="iced"] { --ice: inline; --steam: none; }
+/* Custom properties inherit into the reused SVG symbol for each cup. */
+.liquid { fill: var(--liquid); } .dark-liquid { fill: var(--dark-liquid); }
+.cup-label { fill: var(--label); }
+.coffee-symbol { display: var(--coffee-symbol); }
+.tea-symbol { display: var(--tea-symbol); }
+.ice, .straw { display: var(--ice); } .steam { display: var(--steam); }
+.drink-copy { padding: 0 24px 24px; text-align: center; }
+.drink-name { margin: 0; font-size: 1.8rem; font-weight: 850; letter-spacing: -.04em; }
+.recipe { margin: 6px 0 16px; color: var(--muted); font-size: .85rem; }
+.price { padding-top: 14px; border-top: 1px solid var(--border);
+  font-size: 2rem; font-weight: 850; color: var(--team-accent); }
+.receipt { margin: 24px 0; padding: 20px 24px; border: 1px solid var(--border);
+  border-left: 4px solid var(--stage-accent); border-radius: 13px; background: #ffffff05; }
+.label { color: var(--stage-accent); font-size: .8rem; text-transform: uppercase;
+  letter-spacing: .12em; font-weight: 800; }
+time { display: block; margin: 8px 0; font-variant-numeric: tabular-nums; }
+.date { display: block; color: var(--muted); font-size: 1rem; }
+.clock { font-size: clamp(25px, 5vw, 40px); font-weight: 850; }
+.zone { color: var(--muted); font-size: 1rem; }
+.revision { color: var(--muted); font-size: .85rem; }
+code { color: var(--ink); font-size: 1rem; font-weight: 750; }
+footer { border-top: 1px solid var(--border); margin-top: 25px;
+  padding: 18px 0 25px; color: var(--muted); font-size: .75rem; line-height: 1.8; }
+footer strong { font-size: .65rem; letter-spacing: .08em; }
+@media (max-width: 650px) {
+  .wrap { width: min(100% - 28px, 460px); }
+  .conference { font-size: .7rem; } .pill { font-size: .57rem; padding: 4px 7px; }
+  .menu { grid-template-columns: 1fr; gap: 20px; }
+  .drink-scene { height: 170px; } .drink-art { width: 202px; height: 195px; }
+  .drink-name { font-size: 1.6rem; }
+}
+</style>
+</head>
+<body class="$stage">
+<!-- Cup geometry reused from labs/shared/coffee-tea/index.html; no Lab 2 JS. -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute"
+     xmlns="http://www.w3.org/2000/svg">
+<defs><symbol id="workshop-cup" viewBox="0 0 260 260">
+  <ellipse cx="130" cy="234" rx="66" ry="10" fill="#000" opacity=".35"/>
+  <g class="straw"><path d="M147 131 L160 24 L192 13" fill="none" stroke="#d8efe4" stroke-width="10" stroke-linejoin="round"/><path d="M147 131 L160 24 L192 13" fill="none" stroke="#74b1b6" stroke-width="3" stroke-linejoin="round"/></g>
+  <g class="steam" fill="none" stroke="#cbe6df" stroke-width="3" stroke-linecap="round" opacity=".75"><path d="M106 66 C91 48 119 47 104 28"/><path d="M130 60 C115 43 143 40 129 20"/><path d="M155 66 C140 49 168 44 155 29"/></g>
+  <path d="M68 83 L83 215 Q130 239 177 215 L192 83 Z" fill="#e2d9cb"/>
+  <path d="M75 112 L87 210 Q130 229 173 210 L185 112 Z" class="liquid"/>
+  <path d="M85 191 L87 210 Q130 229 173 210 L176 190 Q130 209 85 191 Z" class="dark-liquid"/>
+  <ellipse cx="130" cy="112" rx="55" ry="13" class="liquid"/>
+  <g class="ice" fill="#fff" fill-opacity=".33" stroke="#fff" stroke-opacity=".45" stroke-width="1.5"><rect x="92" y="108" width="23" height="23" rx="6" transform="rotate(-14 104 119)"/><rect x="135" y="117" width="25" height="24" rx="6" transform="rotate(15 147 128)"/><rect x="119" y="93" width="23" height="21" rx="5" transform="rotate(10 130 103)"/></g>
+  <path d="M72 93 L85 210" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="4" stroke-linecap="round"/>
+  <rect x="94" y="146" width="72" height="50" rx="13" class="cup-label"/>
+  <g class="coffee-symbol"><ellipse cx="130" cy="171" rx="12" ry="16" fill="#67412a" transform="rotate(32 130 171)"/><path d="M135 158 Q122 164 130 173 Q137 181 123 184" fill="none" stroke="#e4bc88" stroke-width="2.5"/></g>
+  <g class="tea-symbol"><path d="M115 182 Q111 157 145 157 Q149 181 115 182 Z" fill="#578545"/><path d="M114 187 L139 163" stroke="#294f29" stroke-width="2.5" fill="none" stroke-linecap="round"/></g>
+  <ellipse cx="130" cy="84" rx="65" ry="15" fill="#edf4ec"/>
+  <ellipse cx="130" cy="80" rx="61" ry="12" fill="#c9d8d1"/>
+  <path d="M70 83 Q130 104 190 83" fill="none" stroke="#b1c4bb" stroke-width="4"/>
+  <path d="M112 155 L147 155" fill="none" stroke="#fff" stroke-opacity=".32" stroke-width="2"/>
+</symbol></defs>
+</svg>
+<div class="wrap">
+<header class="topbar">
+  <div class="conference"><span>LINE</span> DEV CONF 2026</div>
+  <span class="pill">Workshop playground</span>
+</header>
+<main>
+<div class="hero">
+  <p class="eyebrow">SAME DRINK COUNTER. A NEW PUBLICATION BOUNDARY.</p>
+  <h1>After-lunch <span>recharge.</span></h1>
+  <p class="lead">$description</p>
+</div>
+<div class="stage">$stage_label</div>
+$content
+<section class="receipt" aria-label="Revision and operation timestamp">
+<div class="label">$time_label</div>
+<time datetime="$timestamp" data-local-time><span class="date">$date</span>
+<span class="clock">$clock</span> <span class="zone">UTC</span></time>
+<div class="revision">Content revision <code>$revision</code></div>
+</section>
+</main>
+<footer>
+<strong>SECURE AGENTIC DEVELOPMENT · AFTER-LUNCH PLAYGROUND</strong><br>
+Timestamp recorded when this page was created or published—not when you refresh.<br>
+Initial live pages are seeded at demo initialization. Synthetic conference site.<br>
+Publication-denial evidence belongs in the native OpenShell TUI, not this website.
+</footer>
+</div>
+</body>
+</html>

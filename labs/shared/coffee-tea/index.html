@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>After-Lunch Recharge · Team Coffee vs Team Tea</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+      --bg: #0a0b10; --ink: #f5f7ff; --muted: #a3adc2;
+      --green: #00e676; --blue: #2979ff; --purple: #b388ff;
+      --border: rgba(255,255,255,.12);
+      --gradient: linear-gradient(120deg, var(--green), var(--blue));
+      color: var(--ink); background: var(--bg);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(ellipse at 10% 28%, #00e6760b, transparent 45%),
+                  radial-gradient(ellipse at 92% 50%, #2979ff13, transparent 45%);
+      min-height: 100vh;
+    }
+    button, select { font: inherit; }
+    button, select, summary { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, select:focus-visible, summary:focus-visible {
+      outline: 3px solid var(--green); outline-offset: 4px;
+    }
+    button:disabled, select:disabled { opacity: .5; cursor: wait; }
+    [hidden] { display: none !important; }
+    .wrap { width: min(1080px, calc(100% - 40px)); margin: auto; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 24px 0; border-bottom: 1px solid var(--border); }
+    .conference { font-size: .85rem; font-weight: 850; letter-spacing: .04em; }
+    .conference span { color: var(--green); }
+    .pill { display: inline-flex; align-items: center; gap: 8px; padding: 5px 11px; border: 1px solid var(--border); border-radius: 30px; font-size: .66rem; letter-spacing: .1em; font-weight: 750; text-transform: uppercase; }
+    .pill::before { content: ''; width: 6px; height: 6px; background: var(--green); border-radius: 50%; }
+    .hero { text-align: center; padding: 34px 0 26px; }
+    .eyebrow { color: var(--purple); font-size: .7rem; letter-spacing: .2em; font-weight: 800; margin: 0 0 10px; }
+    h1 { margin: 0; font-size: clamp(2.5rem, 6vw, 4.5rem); line-height: 1.02; font-weight: 900; letter-spacing: -.055em; }
+    h1 span { background: var(--gradient); background-clip: text; -webkit-background-clip: text; color: transparent; }
+    .lead { color: var(--muted); margin: 14px 0 0; }
+    .arena { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .versus { z-index: 1; position: absolute; left: 50%; top: 195px; transform: translate(-50%, -50%) rotate(-8deg); background: var(--bg); border: 1px solid #ffffff30; border-radius: 50%; padding: 13px 10px; font-size: .7rem; font-weight: 900; color: var(--muted); }
+    .team-card { --team-accent: #ffc288; --team-glow: #ef9c3820; position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 22px; background: #ffffff05; }
+    .team-card[data-team="tea"] { --team-accent: #aceda1; --team-glow: #00e67618; }
+    .team-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--team-accent), transparent); }
+    .team-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 21px 24px 0; }
+    .team-name { margin: 0; font-size: .9rem; letter-spacing: .12em; font-weight: 850; color: var(--team-accent); }
+    .team-number { font-size: .65rem; color: var(--muted); letter-spacing: .13em; }
+    .drink-scene { position: relative; height: 205px; display: grid; place-items: center; margin: 2px 0 0; }
+    .drink-scene::before { content: ''; position: absolute; width: 190px; height: 150px; border-radius: 50%; background: var(--team-glow); filter: blur(25px); }
+    .drink-art { position: relative; width: 232px; height: 222px; overflow: visible; --liquid: #936039; --dark-liquid: #56331f; --label: #fce0b3; }
+    .drink-art[data-drink="matcha"] { --liquid: #9dc967; --dark-liquid: #557d38; --label: #efffdb; }
+    .drink-art .liquid { fill: var(--liquid); transition: fill .35s; }
+    .drink-art .dark-liquid { fill: var(--dark-liquid); transition: fill .35s; }
+    .drink-art .cup-label { fill: var(--label); transition: fill .35s; }
+    .drink-art .tea-symbol, .drink-art .steam { display: none; }
+    .drink-art[data-drink="matcha"] .coffee-symbol { display: none; }
+    .drink-art[data-drink="matcha"] .tea-symbol { display: inline; }
+    .drink-art[data-temperature="hot"] .ice, .drink-art[data-temperature="hot"] .straw { display: none; }
+    .drink-art[data-temperature="hot"] .steam { display: inline; }
+    .orbit-label { position: absolute; top: 42px; right: 25px; transform: rotate(8deg); border: 1px solid #ffffff22; border-radius: 8px; padding: 5px 9px; color: var(--muted); font-size: .64rem; letter-spacing: .08em; }
+    .drink-copy { padding: 0 24px; text-align: center; }
+    .drink-name { margin: 0; font-size: 1.8rem; font-weight: 850; letter-spacing: -.04em; }
+    .recipe { margin: 4px 0 12px; color: var(--muted); font-size: .85rem; }
+    .identity { display: inline-block; min-height: 30px; margin: 0; padding: 4px 10px; border-radius: 30px; color: #b9c4d9; background: #ffffff08; font-size: .82rem; }
+    .team-card[data-mismatch="true"] { border-color: #ffc288a6; }
+    .team-card[data-mismatch="true"] .identity { background: #ffb04d19; color: #ffd197; font-weight: 750; }
+    .team-card.changed { animation: changed .8s ease-out; }
+    @keyframes changed { from { box-shadow: 0 0 0 3px #ffc28880; } to { box-shadow: 0 0 0 0 transparent; } }
+    form { margin: 19px 24px 22px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { display: block; color: var(--muted); font-size: .8rem; font-weight: 750; letter-spacing: .09em; text-transform: uppercase; }
+    select { display: block; width: 100%; margin-top: 7px; background: #141821; color: var(--ink); border: 1px solid #ffffff25; border-radius: 9px; padding: 10px; font-size: .82rem; cursor: pointer; }
+    .save { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 14px; padding: 12px 16px; background: var(--gradient); color: #07191c; border: 0; border-radius: 10px; cursor: pointer; font-size: .85rem; font-weight: 850; letter-spacing: .035em; }
+    .save:hover:not(:disabled) { filter: brightness(1.12); }
+    .save .arrow { font-size: 1.1rem; line-height: 1; }
+    .notice { display: flex; align-items: flex-start; gap: 14px; padding: 17px 20px; margin: 22px 0 16px; border: 1px solid #b388ff35; border-radius: 13px; background: #b388ff08; }
+    .notice-icon { display: grid; place-items: center; flex: 0 0 26px; height: 26px; border-radius: 7px; background: #b388ff1a; color: var(--purple); font-weight: 850; }
+    .notice p { margin: 0; font-size: .87rem; }
+    .notice small { display: block; color: var(--muted); margin-top: 3px; font-size: .76rem; }
+    .notice[data-state="mixed"] { border-color: #ffc28860; background: #ffc28809; }
+    .notice[data-state="mixed"] .notice-icon { color: #ffc288; background: #ffc2881a; }
+    .notice[data-state="error"] { border-color: #ff8585; }
+    details { color: var(--muted); font-size: .79rem; }
+    summary { cursor: pointer; width: fit-content; padding: 4px 0; }
+    details p { max-width: 760px; }
+    footer { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--border); margin-top: 25px; padding: 18px 0 25px; color: var(--muted); font-size: .65rem; }
+    @media (max-width: 650px) {
+      .wrap { width: min(100% - 28px, 460px); }
+      .conference { font-size: .7rem; } .pill { font-size: .57rem; padding: 4px 7px; }
+      .hero { padding: 28px 0 24px; } .lead { font-size: .85rem; }
+      .arena { grid-template-columns: 1fr; gap: 20px; } .versus { display: none; }
+      .drink-scene { height: 170px; } .drink-art { width: 202px; height: 195px; }
+      .team-head { padding-top: 18px; } .drink-name { font-size: 1.6rem; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="topbar">
+      <div class="conference"><span>LINE</span> DEV CONF 2026</div>
+      <span class="pill">Workshop playground</span>
+    </header>
+    <main>
+      <div class="hero">
+        <p class="eyebrow">LUNCH IS OVER. PICK YOUR FUEL.</p>
+        <h1>After-lunch <span>recharge.</span></h1>
+        <p class="lead">Two teams. Two drinks. What could possibly go wrong?</p>
+      </div>
+      <div id="arena" class="arena" aria-busy="true">
+        <div class="versus" aria-hidden="true">VS</div>
+      </div>
+      <div id="notice" class="notice" data-state="loading" role="status" aria-live="polite" aria-atomic="true">
+        <span class="notice-icon" aria-hidden="true">?</span>
+        <div><p id="status">Connecting to the local drink counter…</p><small id="status-detail">Orders are fictional. No caffeine is actually delivered.</small></div>
+      </div>
+      <details>
+        <summary>What should a correct app do?</summary>
+        <p>Saving one team's drink must not change the other team's order. Both teams should keep their own drink and preferences, including after a browser reload. The cup pictures and labels reflect the orders returned by the Python API—not a simulated failure.</p>
+      </details>
+    </main>
+    <footer><span>SECURE AGENTIC DEVELOPMENT · AFTER-LUNCH PLAYGROUND</span><span>Local prototype · Fake orders · No accounts or real purchases</span></footer>
+  </div>
+
+  <template id="card-template">
+    <article class="team-card">
+      <div class="team-head"><h2 class="team-name"></h2><span class="team-number"></span></div>
+      <div class="drink-scene" aria-hidden="true">
+        <span class="orbit-label"></span>
+        <svg class="drink-art" viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="130" cy="234" rx="66" ry="10" fill="#000" opacity=".35"/>
+          <g class="straw"><path d="M147 131 L160 24 L192 13" fill="none" stroke="#d8efe4" stroke-width="10" stroke-linejoin="round"/><path d="M147 131 L160 24 L192 13" fill="none" stroke="#74b1b6" stroke-width="3" stroke-linejoin="round"/></g>
+          <g class="steam" fill="none" stroke="#cbe6df" stroke-width="3" stroke-linecap="round" opacity=".75"><path d="M106 66 C91 48 119 47 104 28"/><path d="M130 60 C115 43 143 40 129 20"/><path d="M155 66 C140 49 168 44 155 29"/></g>
+          <path d="M68 83 L83 215 Q130 239 177 215 L192 83 Z" fill="#e2d9cb"/>
+          <path d="M75 112 L87 210 Q130 229 173 210 L185 112 Z" class="liquid"/>
+          <path d="M85 191 L87 210 Q130 229 173 210 L176 190 Q130 209 85 191 Z" class="dark-liquid"/>
+          <ellipse cx="130" cy="112" rx="55" ry="13" class="liquid"/>
+          <g class="ice" fill="#fff" fill-opacity=".33" stroke="#fff" stroke-opacity=".45" stroke-width="1.5"><rect x="92" y="108" width="23" height="23" rx="6" transform="rotate(-14 104 119)"/><rect x="135" y="117" width="25" height="24" rx="6" transform="rotate(15 147 128)"/><rect x="119" y="93" width="23" height="21" rx="5" transform="rotate(10 130 103)"/></g>
+          <path d="M72 93 L85 210" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="4" stroke-linecap="round"/>
+          <rect x="94" y="146" width="72" height="50" rx="13" class="cup-label"/>
+          <g class="coffee-symbol"><ellipse cx="130" cy="171" rx="12" ry="16" fill="#67412a" transform="rotate(32 130 171)"/><path d="M135 158 Q122 164 130 173 Q137 181 123 184" fill="none" stroke="#e4bc88" stroke-width="2.5"/></g>
+          <g class="tea-symbol"><path d="M115 182 Q111 157 145 157 Q149 181 115 182 Z" fill="#578545"/><path d="M114 187 L139 163" stroke="#294f29" stroke-width="2.5" fill="none" stroke-linecap="round"/></g>
+          <ellipse cx="130" cy="84" rx="65" ry="15" fill="#edf4ec"/>
+          <ellipse cx="130" cy="80" rx="61" ry="12" fill="#c9d8d1"/>
+          <path d="M70 83 Q130 104 190 83" fill="none" stroke="#b1c4bb" stroke-width="4"/>
+          <path d="M112 155 L147 155" fill="none" stroke="#fff" stroke-opacity=".32" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="drink-copy">
+        <h3 class="drink-name"></h3>
+        <p class="recipe"></p>
+        <p class="identity"></p>
+      </div>
+      <form>
+        <div class="choices">
+          <label>Temperature<select name="temperature"><option value="iced">Iced / เย็น</option><option value="hot">Hot / ร้อน</option></select></label>
+          <label>Sweetness<select name="sweetness"><option value="0">0% · No sugar</option><option value="25">25% · A little</option><option value="50">50% · Balanced</option><option value="75">75% · Sweet</option><option value="100">100% · Very sweet</option></select></label>
+        </div>
+        <button class="save" type="submit"><span class="save-label"></span><span class="arrow" aria-hidden="true">↗</span></button>
+      </form>
+    </article>
+  </template>
+  <script>
+    const teams = {
+      coffee: { name: 'Team Coffee', number: '01 / THE COFFEE CREW', motto: 'POWERED BY BEANS', action: 'SAVE MY COFFEE' },
+      tea: { name: 'Team Tea', number: '02 / THE TEA CREW', motto: 'MATCHA MODE: ON', action: 'SAVE MY TEA' },
+    };
+    const cards = new Map();
+    const arena = document.querySelector('#arena');
+    let loading = true;
+
+    function notice(state, title, detail) {
+      document.querySelector('#notice').dataset.state = state;
+      document.querySelector('#status').textContent = title;
+      document.querySelector('#status-detail').textContent = detail;
+    }
+
+    function busy(value) {
+      loading = value;
+      arena.setAttribute('aria-busy', String(value));
+      arena.querySelectorAll('button, select').forEach(control => { control.disabled = value; });
+    }
+
+    async function request(path, selection) {
+      const options = { cache: 'no-store' };
+      if (selection !== undefined) {
+        options.method = 'POST';
+        options.headers = { 'Content-Type': 'application/json' };
+        options.body = JSON.stringify(selection);
+      }
+      const response = await fetch(path, options);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || 'Request failed');
+      return body;
+    }
+
+    function render(rows, highlight = false) {
+      for (const { team_id: teamId, order } of rows) {
+        const card = cards.get(teamId);
+        const previous = card.dataset.order;
+        const current = JSON.stringify(order);
+        const mismatch = order.team_id !== teamId;
+        card.dataset.order = current;
+        card.dataset.mismatch = String(mismatch);
+        const art = card.querySelector('.drink-art');
+        art.dataset.drink = order.drink;
+        art.dataset.temperature = order.temperature;
+        card.querySelector('.drink-name').textContent = `${order.temperature === 'iced' ? 'Iced' : 'Hot'} ${order.drink === 'coffee' ? 'Coffee' : 'Matcha'}`;
+        card.querySelector('.recipe').textContent = `${order.sweetness}% sweetness · ${order.temperature === 'iced' ? 'Over ice' : 'Served warm'}`;
+        card.querySelector('.identity').textContent = mismatch
+          ? `Wrong cup: this order belongs to ${teams[order.team_id].name}`
+          : `Your ${order.drink === 'coffee' ? 'coffee' : 'tea'}. Your rules.`;
+        card.querySelector('[name="temperature"]').value = order.temperature;
+        card.querySelector('[name="sweetness"]').value = String(order.sweetness);
+        card.classList.remove('changed');
+        if (highlight && previous !== current) {
+          void card.offsetWidth;
+          card.classList.add('changed');
+        }
+      }
+      return rows.filter(row => row.order.team_id !== row.team_id);
+    }
+
+    function describe(rows, savedTeam) {
+      const mismatches = rows.filter(row => row.order.team_id !== row.team_id);
+      if (mismatches.length) {
+        const row = mismatches[0];
+        notice('mixed', `Wait… ${teams[row.team_id].name} got ${teams[row.order.team_id].name}'s drink!`,
+          'The team labels stayed put. The returned order did not. Reload the page: the mix-up is still saved.');
+      } else if (savedTeam) {
+        notice('ready', `${teams[savedTeam].name}'s drink is saved.`,
+          'Both teams still have their own drinks. Changing one should never change the other.');
+      } else {
+        notice('ready', 'Try this: change Team Tea to 0% sweetness. Then save.',
+          'Keep an eye on Team Coffee’s cup. You did not order tea for them.');
+      }
+    }
+
+    async function save(teamId, form) {
+      if (loading) return;
+      const selection = { temperature: form.elements.temperature.value, sweetness: Number(form.elements.sweetness.value) };
+      const focusBeforeSave = document.activeElement;
+      busy(true);
+      notice('loading', `Saving ${teams[teamId].name}'s drink…`, 'Then reloading both team orders from the local API.');
+      let saved = false;
+      try {
+        await request(`/api/orders/${teamId}`, selection);
+        saved = true;
+        const rows = await request('/api/orders');
+        render(rows, true);
+        describe(rows, teamId);
+      } catch (error) {
+        notice('error', saved ? 'Save completed, but the order view could not refresh.' : 'The save was not confirmed.',
+          `${error.message}. Reload to inspect current state before retrying.`);
+      } finally {
+        busy(false);
+        if (form.contains(focusBeforeSave) && document.activeElement === document.body) {
+          focusBeforeSave.focus({ preventScroll: true });
+        }
+      }
+    }
+
+    async function start() {
+      for (const [teamId, team] of Object.entries(teams)) {
+        const card = document.querySelector('#card-template').content.firstElementChild.cloneNode(true);
+        card.dataset.team = teamId;
+        card.querySelector('.team-name').textContent = team.name.toUpperCase();
+        card.querySelector('.team-number').textContent = team.number;
+        card.querySelector('.orbit-label').textContent = team.motto;
+        card.querySelector('.save-label').textContent = team.action;
+        const form = card.querySelector('form');
+        form.setAttribute('aria-label', `${team.name} drink preferences`);
+        form.addEventListener('submit', event => { event.preventDefault(); save(teamId, form); });
+        card.hidden = true;
+        cards.set(teamId, card);
+        arena.append(card);
+      }
+      busy(true);
+      try {
+        const rows = await request('/api/orders');
+        render(rows);
+        cards.forEach(card => { card.hidden = false; });
+        describe(rows);
+        busy(false);
+      } catch (error) {
+        arena.setAttribute('aria-busy', 'false');
+        notice('error', 'Cannot load the drink counter.', `${error.message}. Check the server terminal and reload.`);
+      }
+    }
+
+    start();
+  </script>
+</body>
+</html>

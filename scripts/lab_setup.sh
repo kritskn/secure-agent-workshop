@@ -12,18 +12,19 @@ source "${SCRIPT_DIR}/setup_prep.sh"
 
 #######################################
 # Run shared Docker preparation, retaining partial work on failure/cancellation.
-# Globals: SCRIPT_DIR and coordinator handoffs. Arguments: none.
+# Globals: SCRIPT_DIR and handoffs. Arguments: --build-only [--no-cache].
 # Outputs: progress/prompts/recovery. Returns: coordinator status, 2 bad args.
 #######################################
 main() {
-  if (( $# != 0 )); then
-    lab_print '%s\n' '[FAIL] Usage: ./lab.sh setup (no arguments)' >&2
+  if ! [[ $# -eq 0 || ( "${1:-}" == --build-only \
+    && ( $# -eq 1 || ( $# -eq 2 && "$2" == --no-cache ) ) ) ]]; then
+    lab_status FAIL 'Usage: ./lab.sh setup [--build-only [--no-cache]]'
     return 2
   fi
   trap 'lab_stop_work' EXIT
   trap 'lab_stop_work; prep_cancelled setup; exit 130' INT
   trap 'lab_stop_work; prep_cancelled setup; exit 143' TERM
   trap 'lab_stop_work; prep_cancelled setup; exit 129' HUP
-  setup_prep "${SCRIPT_DIR%/*}"
+  setup_prep "${SCRIPT_DIR%/*}" "$@"
 }
 main "$@"

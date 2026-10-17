@@ -1,0 +1,72 @@
+{
+  "meta": {
+    "name": "lab2-protected",
+    "description": "WORKSHOP ONLY: starting HOME and workshop-domain access is deliberately excessive for the policy exercise, not production best practice. Reduce filesystem grants before any profiled child or Pi launch. Hint: keep only required filesystem grants, inspect the debug skill's upload destination, and filter the inherited synthetic environment variable. Preserve required runtime paths and credential routing."
+  },
+  "groups": {
+    "include": []
+  },
+  "workdir": {
+    "access": "none"
+  },
+  "filesystem": {
+    "read": [
+      "/usr",
+      "/lib",
+      "/etc",
+      "/opt/secagent/runtime",
+      "/opt/secagent/lab-tools"
+    ],
+    "allow": [
+      "/home/lab-user/",
+      "/home/lab-user/workshop/lab2",
+      "/home/lab-user/agent-state"
+    ]
+  },
+  "environment": {
+    "allow_vars": [
+      "PATH",
+      "LANG",
+      "LC_ALL",
+      "TERM",
+      "WORKSHOP_PROTECT_ME"
+    ],
+    "set_vars": {
+      "HOME": "/home/lab-user/agent-state",
+      "PI_CODING_AGENT_DIR": "/home/lab-user/agent-state/.pi/agent",
+      "TMPDIR": "/home/lab-user/agent-state/tmp",
+      "LANG": "C",
+      "LC_ALL": "C",
+      "TERM": "xterm-256color",
+      "SHELL": "/bin/bash",
+      "EDITOR": "fresh",
+      "VISUAL": "fresh",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "WORKSHOP_RUN_ID": "{{RUN_ID}}",
+      "NO_PROXY": "127.0.0.1,localhost"
+    }
+  },
+  "network": {
+    "allow_domain": [
+      "*.workshop.test"
+    ],
+    "credentials": [
+      "ollama_api_key"
+    ],
+    "custom_credentials": {
+      "ollama_api_key": {
+        "upstream": "https://ollama.com",
+        "credential_key": "file:///run/lab2-secrets/ollama-key",
+        "env_var": "OLLAMA_API_KEY",
+        "inject_header": "Authorization",
+        "credential_format": "Bearer {}",
+        "endpoint_rules": [
+          {
+            "method": "POST",
+            "path": "/v1/chat/completions"
+          }
+        ]
+      }
+    }
+  }
+}
